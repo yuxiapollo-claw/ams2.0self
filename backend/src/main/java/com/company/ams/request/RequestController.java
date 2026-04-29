@@ -1,6 +1,7 @@
 package com.company.ams.request;
 
 import com.company.ams.common.api.ApiResponse;
+import com.company.ams.auth.AuthenticatedUserResolver;
 import com.company.ams.auth.UserPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,7 @@ public class RequestController {
     public ApiResponse<RequestCreateResponse> create(
             @RequestBody CreateRequestCommand command,
             Authentication authentication) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        UserPrincipal principal = AuthenticatedUserResolver.resolve(authentication);
         return ApiResponse.success(requestService.create(command, principal));
     }
 

@@ -11,9 +11,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class UserRepository {
-    private static final String DEFAULT_PASSWORD_HASH =
-            "$2a$10$mMQ4LA/fmGkbcXoS0ZITM.QOjGsgIo9ECYRHi2ucTBOdmI/BvCyPq";
-
     private final JdbcTemplate jdbcTemplate;
 
     public UserRepository(JdbcTemplate jdbcTemplate) {
@@ -23,7 +20,7 @@ public class UserRepository {
     public Optional<AuthUserRecord> findByLoginName(String loginName) {
         List<AuthUserRecord> matches = jdbcTemplate.query(
                 """
-                select id, login_name, user_name, department_id, password_hash, account_status
+                select id, login_name, user_name, department_id, password_hash, account_status, is_system_admin
                 from sys_user
                 where deleted = 0 and login_name = ?
                 """,
@@ -33,8 +30,28 @@ public class UserRepository {
                         rs.getString("user_name"),
                         rs.getLong("department_id"),
                         rs.getString("password_hash"),
-                        rs.getString("account_status")),
+                        rs.getString("account_status"),
+                        rs.getBoolean("is_system_admin")),
                 loginName);
+        return matches.stream().findFirst();
+    }
+
+    public Optional<AuthUserRecord> findAuthUserById(long userId) {
+        List<AuthUserRecord> matches = jdbcTemplate.query(
+                """
+                select id, login_name, user_name, department_id, password_hash, account_status, is_system_admin
+                from sys_user
+                where deleted = 0 and id = ?
+                """,
+                (rs, rowNum) -> new AuthUserRecord(
+                        rs.getLong("id"),
+                        rs.getString("login_name"),
+                        rs.getString("user_name"),
+                        rs.getLong("department_id"),
+                        rs.getString("password_hash"),
+                        rs.getString("account_status"),
+                        rs.getBoolean("is_system_admin")),
+                userId);
         return matches.stream().findFirst();
     }
 
@@ -60,13 +77,14 @@ public class UserRepository {
                        u.user_code,
                        u.user_name,
                        u.department_id,
-                       d.department_name,
+                       coalesce(d.department_name, '') as department_name,
                        u.employment_status,
                        u.login_name,
-                       u.account_status
+                       u.account_status,
+                       u.is_system_admin
                 from sys_user u
-                join sys_department d on d.id = u.department_id
-                where u.deleted = 0 and d.deleted = 0
+                left join sys_department d on d.id = u.department_id and d.deleted = 0
+                where u.deleted = 0
                 order by u.id
                 """,
                 (rs, rowNum) -> new UserRow(
@@ -77,10 +95,11 @@ public class UserRepository {
                         rs.getString("department_name"),
                         rs.getString("employment_status"),
                         rs.getString("login_name"),
-                        rs.getString("account_status")));
+                        rs.getString("account_status"),
+                        rs.getBoolean("is_system_admin")));
     }
 
-    public UserRow create(UserUpsertCommand command) {
+    public UserRow create(UserUpsertCommand command, String passwordHash) {
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
             var statement = connection.prepareStatement(
@@ -93,10 +112,11 @@ public class UserRepository {
                       login_name,
                       password_hash,
                       account_status,
+                      is_system_admin,
                       created_at,
                       updated_at,
                       deleted
-                    ) values (?, ?, ?, ?, ?, ?, ?, current_timestamp, current_timestamp, 0)
+                    ) values (?, ?, ?, ?, ?, ?, ?, 0, current_timestamp, current_timestamp, 0)
                     """,
                     new String[] {"id"});
             statement.setString(1, command.userCode());
@@ -104,7 +124,7 @@ public class UserRepository {
             statement.setLong(3, command.departmentId());
             statement.setString(4, command.employmentStatus());
             statement.setString(5, command.loginName());
-            statement.setString(6, DEFAULT_PASSWORD_HASH);
+            statement.setString(6, passwordHash);
             statement.setString(7, command.accountStatus());
             return statement;
         }, keyHolder);
@@ -219,7 +239,7 @@ public class UserRepository {
     }
 
     public boolean existsUnfinishedRequestsByUser(long userId) {
-        Integer count = jdbcTemplate.queryForObject(
+        Integer legacyCount = jdbcTemplate.queryForObject(
                 """
                 select count(*)
                 from request_order
@@ -229,7 +249,17 @@ public class UserRepository {
                 Integer.class,
                 userId,
                 userId);
-        return count != null && count > 0;
+        Integer accessCount = jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from access_request
+                where (applicant_user_id = ? or target_user_id = ?)
+                  and current_status <> 'COMPLETED'
+                """,
+                Integer.class,
+                userId,
+                userId);
+        return (legacyCount != null && legacyCount > 0) || (accessCount != null && accessCount > 0);
     }
 
     public boolean existsActiveDepartment(long departmentId) {
@@ -244,20 +274,21 @@ public class UserRepository {
         return count != null && count > 0;
     }
 
-    private UserRow getRequiredUserRow(long userId) {
+    public UserRow getRequiredUserRow(long userId) {
         List<UserRow> matches = jdbcTemplate.query(
                 """
                 select u.id,
                        u.user_code,
                        u.user_name,
                        u.department_id,
-                       d.department_name,
+                       coalesce(d.department_name, '') as department_name,
                        u.employment_status,
                        u.login_name,
-                       u.account_status
+                       u.account_status,
+                       u.is_system_admin
                 from sys_user u
-                join sys_department d on d.id = u.department_id
-                where u.deleted = 0 and d.deleted = 0 and u.id = ?
+                left join sys_department d on d.id = u.department_id and d.deleted = 0
+                where u.deleted = 0 and u.id = ?
                 """,
                 (rs, rowNum) -> new UserRow(
                         rs.getLong("id"),
@@ -267,12 +298,28 @@ public class UserRepository {
                         rs.getString("department_name"),
                         rs.getString("employment_status"),
                         rs.getString("login_name"),
-                        rs.getString("account_status")),
+                        rs.getString("account_status"),
+                        rs.getBoolean("is_system_admin")),
                 userId);
         if (matches.isEmpty()) {
             throw new IllegalArgumentException("User " + userId + " does not exist");
         }
         return matches.get(0);
+    }
+
+    public void updatePasswordHash(long userId, String passwordHash) {
+        int updated = jdbcTemplate.update(
+                """
+                update sys_user
+                set password_hash = ?,
+                    updated_at = current_timestamp
+                where id = ? and deleted = 0
+                """,
+                passwordHash,
+                userId);
+        if (updated == 0) {
+            throw new IllegalArgumentException("User " + userId + " does not exist");
+        }
     }
 
     public record AuthUserRecord(
@@ -281,7 +328,8 @@ public class UserRepository {
             String userName,
             long departmentId,
             String passwordHash,
-            String accountStatus) {}
+            String accountStatus,
+            boolean systemAdmin) {}
 
     public record RequestUserRecord(
             long id,

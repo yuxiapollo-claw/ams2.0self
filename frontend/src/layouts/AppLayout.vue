@@ -18,17 +18,27 @@ import AppTopbar from '../components/shell/AppTopbar.vue'
 <style scoped>
 .layout-shell {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: transparent;
 }
 
 .layout-shell__body {
-  min-height: calc(100vh - 56px);
+  min-height: calc(100vh - var(--cockpit-topbar-h));
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 308px 1fr;
 }
 
 .layout-shell__content {
-  padding: 16px;
+  padding: 22px;
   min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .layout-shell__body {
+    grid-template-columns: 1fr;
+  }
+
+  .layout-shell__content {
+    padding: 18px;
+  }
 }
 </style>

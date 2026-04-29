@@ -18,6 +18,14 @@ export interface DepartmentMutationPayload {
   status: string
 }
 
+export interface DepartmentMemberItem {
+  id: string
+  userName: string
+  loginName: string
+  departmentId: string
+  departmentName: string
+}
+
 interface ApiResponse<T> {
   code?: number
   message?: string
@@ -38,6 +46,14 @@ interface DepartmentRowRaw {
   memberCount?: number
   status?: string
   updatedAt?: string
+}
+
+interface DepartmentMemberRowRaw {
+  id?: string | number
+  userName?: string
+  loginName?: string
+  departmentId?: string | number
+  departmentName?: string
 }
 
 function assertRecord(value: unknown, context: string): Record<string, unknown> {
@@ -104,6 +120,17 @@ function normalizeDepartment(raw: unknown): DepartmentItem {
   }
 }
 
+function normalizeDepartmentMember(raw: unknown): DepartmentMemberItem {
+  const row = assertRecord(raw, 'department member row')
+  return {
+    id: readRequiredId(row.id, 'member id'),
+    userName: readRequiredString(row.userName, 'userName'),
+    loginName: readRequiredString(row.loginName, 'loginName'),
+    departmentId: readRequiredId(row.departmentId, 'departmentId'),
+    departmentName: readRequiredString(row.departmentName, 'departmentName')
+  }
+}
+
 export async function fetchDepartments(): Promise<DepartmentItem[]> {
   const { data } = await axios.get<ApiResponse<ListPayload<DepartmentRowRaw>>>('/api/departments')
   const payload = parseEnvelopeData<ListPayload<DepartmentRowRaw>>(data, 'department list')
@@ -129,4 +156,28 @@ export async function updateDepartment(
 export async function deleteDepartment(departmentId: string): Promise<void> {
   const { data } = await axios.delete<ApiResponse<null>>(`/api/departments/${departmentId}`)
   parseEnvelopeData<null>(data, 'delete department')
+}
+
+export async function fetchDepartmentMembers(departmentId: string): Promise<DepartmentMemberItem[]> {
+  const { data } = await axios.get<ApiResponse<ListPayload<DepartmentMemberRowRaw>>>(`/api/departments/${departmentId}/members`)
+  const payload = parseEnvelopeData<ListPayload<DepartmentMemberRowRaw>>(data, 'department member list')
+  if (!payload || !Array.isArray(payload.list)) {
+    throw new Error('Invalid department member list response')
+  }
+  return payload.list.map(normalizeDepartmentMember)
+}
+
+export async function bindDepartmentMembers(
+  departmentId: string,
+  memberUserIds: number[]
+): Promise<DepartmentMemberItem[]> {
+  const { data } = await axios.put<ApiResponse<ListPayload<DepartmentMemberRowRaw>>>(
+    `/api/departments/${departmentId}/members`,
+    { memberUserIds }
+  )
+  const payload = parseEnvelopeData<ListPayload<DepartmentMemberRowRaw>>(data, 'bind department members')
+  if (!payload || !Array.isArray(payload.list)) {
+    throw new Error('Invalid bind department members response')
+  }
+  return payload.list.map(normalizeDepartmentMember)
 }

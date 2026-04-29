@@ -1,6 +1,7 @@
 package com.company.ams.common.persistence;
 
 import com.company.ams.user.DepartmentRow;
+import com.company.ams.user.DepartmentMemberRow;
 import com.company.ams.user.DepartmentUpsertCommand;
 import java.sql.Timestamp;
 import java.time.format.DateTimeFormatter;
@@ -21,6 +22,18 @@ public class DepartmentRepository {
 
     public DepartmentRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public boolean existsNonDeletedDepartment(long departmentId) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sys_department
+                where id = ? and deleted = 0
+                """,
+                Integer.class,
+                departmentId);
+        return count != null && count > 0;
     }
 
     public List<DepartmentRow> findAll() {
@@ -148,6 +161,76 @@ public class DepartmentRepository {
                 Integer.class,
                 departmentId);
         return count != null && count > 0;
+    }
+
+    public List<DepartmentMemberRow> findMembers(long departmentId) {
+        return jdbcTemplate.query(
+                """
+                select u.id,
+                       u.user_name,
+                       u.login_name,
+                       u.department_id,
+                       d.department_name
+                from sys_user u
+                join sys_department d on d.id = u.department_id and d.deleted = 0
+                where u.department_id = ? and u.deleted = 0
+                order by u.user_name, u.id
+                """,
+                (rs, rowNum) -> new DepartmentMemberRow(
+                        rs.getLong("id"),
+                        rs.getString("user_name"),
+                        rs.getString("login_name"),
+                        rs.getLong("department_id"),
+                        rs.getString("department_name")),
+                departmentId);
+    }
+
+    public boolean allUsersExist(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return false;
+        }
+        String placeholders = "?,".repeat(userIds.size());
+        String sql = """
+                select count(*)
+                from sys_user
+                where deleted = 0
+                  and id in (%s)
+                """.formatted(placeholders.substring(0, placeholders.length() - 1));
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, userIds.toArray());
+        return count != null && count == userIds.size();
+    }
+
+    public void reassignUsersToDepartment(long departmentId, List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        String placeholders = "?,".repeat(userIds.size());
+        String inClause = placeholders.substring(0, placeholders.length() - 1);
+        Object[] args = new Object[userIds.size() + 1];
+        args[0] = departmentId;
+        for (int index = 0; index < userIds.size(); index++) {
+            args[index + 1] = userIds.get(index);
+        }
+        jdbcTemplate.update(
+                """
+                update sys_user
+                set department_id = ?,
+                    updated_at = current_timestamp
+                where deleted = 0
+                  and id in (%s)
+                """.formatted(inClause),
+                args);
+    }
+
+    public Long findDepartmentLeaderUserId(long departmentId) {
+        return jdbcTemplate.query(
+                """
+                select manager_user_id
+                from sys_department
+                where id = ? and deleted = 0
+                """,
+                rs -> rs.next() ? (Long) rs.getObject("manager_user_id") : null,
+                departmentId);
     }
 
     private DepartmentRow getRequiredDepartmentRow(long departmentId) {

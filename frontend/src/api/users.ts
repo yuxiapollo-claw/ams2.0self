@@ -9,10 +9,11 @@ export interface UserItem {
   employmentStatus: string
   loginName: string
   accountStatus: string
+  systemAdmin: boolean
 }
 
 export interface UserMutationPayload {
-  userCode: string
+  userCode?: string
   userName: string
   departmentId: number
   employmentStatus: string
@@ -22,6 +23,16 @@ export interface UserMutationPayload {
 
 export interface UserStatusPayload {
   accountStatus: string
+}
+
+export interface PasswordActionResponse {
+  message: string
+  defaultPassword: string | null
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string
+  newPassword: string
 }
 
 interface ApiResponse<T> {
@@ -44,6 +55,7 @@ interface UserRowRaw {
   employmentStatus?: string
   loginName?: string
   accountStatus?: string
+  systemAdmin?: boolean
 }
 
 function assertRecord(value: unknown, context: string): Record<string, unknown> {
@@ -79,13 +91,22 @@ function normalizeUser(raw: unknown): UserItem {
   const row = assertRecord(raw, 'user row')
   return {
     id: readRequiredId(row.id, 'user id'),
-    userCode: readRequiredString(row.userCode, 'userCode'),
+    userCode: typeof row.userCode === 'string' && row.userCode.trim().length > 0 ? row.userCode : readRequiredString(row.loginName, 'loginName'),
     userName: readRequiredString(row.userName, 'userName'),
     departmentId: readRequiredId(row.departmentId, 'departmentId'),
     departmentName: readRequiredString(row.departmentName, 'departmentName'),
     employmentStatus: readRequiredString(row.employmentStatus, 'employmentStatus'),
     loginName: readRequiredString(row.loginName, 'loginName'),
-    accountStatus: readRequiredString(row.accountStatus, 'accountStatus')
+    accountStatus: readRequiredString(row.accountStatus, 'accountStatus'),
+    systemAdmin: Boolean(row.systemAdmin)
+  }
+}
+
+function normalizePasswordAction(raw: unknown): PasswordActionResponse {
+  const row = assertRecord(raw, 'password response')
+  return {
+    message: typeof row.message === 'string' ? row.message : '',
+    defaultPassword: typeof row.defaultPassword === 'string' ? row.defaultPassword : null
   }
 }
 
@@ -99,12 +120,26 @@ export async function fetchUsers(): Promise<UserItem[]> {
 }
 
 export async function createUser(payload: UserMutationPayload): Promise<UserItem> {
-  const { data } = await axios.post<ApiResponse<UserRowRaw>>('/api/users', payload)
+  const { data } = await axios.post<ApiResponse<UserRowRaw>>('/api/users', {
+    userCode: payload.userCode,
+    userName: payload.userName,
+    departmentId: payload.departmentId,
+    employmentStatus: payload.employmentStatus,
+    loginName: payload.loginName,
+    accountStatus: payload.accountStatus
+  })
   return normalizeUser(parseEnvelopeData<UserRowRaw>(data, 'create user'))
 }
 
 export async function updateUser(userId: string, payload: UserMutationPayload): Promise<UserItem> {
-  const { data } = await axios.put<ApiResponse<UserRowRaw>>(`/api/users/${userId}`, payload)
+  const { data } = await axios.put<ApiResponse<UserRowRaw>>(`/api/users/${userId}`, {
+    userCode: payload.userCode,
+    userName: payload.userName,
+    departmentId: payload.departmentId,
+    employmentStatus: payload.employmentStatus,
+    loginName: payload.loginName,
+    accountStatus: payload.accountStatus
+  })
   return normalizeUser(parseEnvelopeData<UserRowRaw>(data, 'update user'))
 }
 
@@ -116,4 +151,14 @@ export async function updateUserStatus(userId: string, payload: UserStatusPayloa
 export async function deleteUser(userId: string): Promise<void> {
   const { data } = await axios.delete<ApiResponse<null>>(`/api/users/${userId}`)
   parseEnvelopeData<null>(data, 'delete user')
+}
+
+export async function resetUserPassword(userId: string): Promise<PasswordActionResponse> {
+  const { data } = await axios.post<ApiResponse<Record<string, unknown>>>(`/api/users/${userId}/reset-password`)
+  return normalizePasswordAction(parseEnvelopeData<Record<string, unknown>>(data, 'reset password'))
+}
+
+export async function changeMyPassword(payload: ChangePasswordPayload): Promise<PasswordActionResponse> {
+  const { data } = await axios.post<ApiResponse<Record<string, unknown>>>('/api/users/change-password', payload)
+  return normalizePasswordAction(parseEnvelopeData<Record<string, unknown>>(data, 'change password'))
 }

@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,13 +44,31 @@ public class AuthController {
         securityContext.setAuthentication(authentication);
         SecurityContextHolder.setContext(securityContext);
         securityContextRepository.saveContext(securityContext, httpRequest, httpResponse);
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        UserPrincipal principal = AuthenticatedUserResolver.resolve(authentication);
 
         LoginResponse response = new LoginResponse(
                 "session-authenticated",
-                new LoginResponse.LoginUser(principal.id(), principal.loginName(), principal.userName()),
+                new LoginResponse.LoginUser(
+                        principal.id(),
+                        principal.loginName(),
+                        principal.userName(),
+                        principal.systemAdmin()),
                 principal.roles());
 
+        return ApiResponse.success(response);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<LoginResponse> me(Authentication authentication) {
+        UserPrincipal principal = AuthenticatedUserResolver.resolve(authentication);
+        LoginResponse response = new LoginResponse(
+                "session-authenticated",
+                new LoginResponse.LoginUser(
+                        principal.id(),
+                        principal.loginName(),
+                        principal.userName(),
+                        principal.systemAdmin()),
+                principal.roles());
         return ApiResponse.success(response);
     }
 

@@ -24,13 +24,14 @@ public class AuthService {
                 .filter(candidate -> passwordEncoder.matches(request.password(), candidate.passwordHash()))
                 .orElseThrow(InvalidCredentialsException::new);
 
-        List<String> roles = "admin".equals(user.loginName())
-                ? List.of("SYS_ADMIN")
+        List<String> roles = user.systemAdmin()
+                ? List.of("SYS_ADMIN", "USER")
                 : List.of("USER");
         UserPrincipal principal = new UserPrincipal(
                 user.id(),
                 user.loginName(),
                 user.userName(),
+                user.systemAdmin(),
                 roles);
         return UsernamePasswordAuthenticationToken.authenticated(
                 principal,
