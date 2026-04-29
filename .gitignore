@@ -1,0 +1,24 @@
+# Dependencies
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+backend/target/
+
+# Local runtime and data
+runtime/
+backend/data/
+backend/_jarinspect/
+.superpowers/
+
+# Test artifacts
+test-results/
+frontend/test-results/
+playwright-report/
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db

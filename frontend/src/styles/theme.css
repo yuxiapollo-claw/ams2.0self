@@ -1,0 +1,66 @@
+:root {
+  --cockpit-radius-lg: 16px;
+  --cockpit-radius-md: 12px;
+  --cockpit-radius-sm: 10px;
+  --cockpit-sidebar-w: 272px;
+  --cockpit-topbar-h: 64px;
+}
+
+:root[data-theme='dark'] {
+  --cockpit-bg: #0b1020;
+  --cockpit-surface: rgba(255, 255, 255, 0.08);
+  --cockpit-surface-2: rgba(255, 255, 255, 0.12);
+  --cockpit-panel-bg: rgba(255, 255, 255, 0.05);
+  --cockpit-input-bg: rgba(0, 0, 0, 0.18);
+  --cockpit-border: rgba(255, 255, 255, 0.14);
+  --cockpit-text: rgba(255, 255, 255, 0.92);
+  --cockpit-muted: rgba(255, 255, 255, 0.68);
+  --cockpit-accent: #5eead4;
+  --cockpit-accent-2: #60a5fa;
+  --cockpit-danger: #fb7185;
+  --cockpit-overlay: rgba(2, 6, 23, 0.56);
+  --cockpit-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  --cockpit-body-top: #070a14;
+  --cockpit-body-bottom: #070a14;
+}
+
+:root[data-theme='light'] {
+  --cockpit-bg: #edf4fb;
+  --cockpit-surface: rgba(255, 255, 255, 0.88);
+  --cockpit-surface-2: rgba(255, 255, 255, 0.96);
+  --cockpit-panel-bg: rgba(255, 255, 255, 0.78);
+  --cockpit-input-bg: rgba(255, 255, 255, 0.94);
+  --cockpit-border: rgba(148, 163, 184, 0.26);
+  --cockpit-text: #0f172a;
+  --cockpit-muted: #475569;
+  --cockpit-accent: #0f766e;
+  --cockpit-accent-2: #2563eb;
+  --cockpit-danger: #e11d48;
+  --cockpit-overlay: rgba(15, 23, 42, 0.22);
+  --cockpit-shadow: 0 22px 48px rgba(15, 23, 42, 0.12);
+  --cockpit-body-top: #f8fbff;
+  --cockpit-body-bottom: #dbeafe;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--cockpit-text);
+  background:
+    radial-gradient(1100px 700px at 15% 8%, rgba(94, 234, 212, 0.18), transparent 55%),
+    radial-gradient(900px 600px at 85% 22%, rgba(96, 165, 250, 0.16), transparent 52%),
+    radial-gradient(900px 650px at 35% 92%, rgba(251, 113, 133, 0.12), transparent 52%),
+    linear-gradient(180deg, var(--cockpit-body-top) 0%, var(--cockpit-bg) 65%, var(--cockpit-body-bottom) 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
